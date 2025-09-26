@@ -11,9 +11,12 @@ android {
     defaultConfig {
         applicationId = "com.example.lab_week_07"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        val MAPS_API_KEY: String? = project.findProperty("MAPS_API_KEY") as String?
+        manifestPlaceholders["MAPS_API_KEY"] = MAPS_API_KEY ?: ""
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
