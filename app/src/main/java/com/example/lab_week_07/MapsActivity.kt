@@ -17,6 +17,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale
 import android.content.pm.PackageManager
+import com.google.android.gms.location.LocationServices
+import android.location.Location
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -24,6 +26,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var binding: ActivityMapsBinding
 
     private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
+
+    private val fusedLocationProviderClient by lazy {
+        LocationServices.getFusedLocationProviderClient(this)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,29 +68,51 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
         // OnMapReady is called when the map is ready to be used
-        // The code below is used to check for the location permission for the map functionality to work
-        // If it's not granted yet, then the rationale dialog will be brought up
         when {
             hasLocationPermission() -> {
-                // Permission sudah granted, ambil lokasi terakhir
                 getLastLocation()
             }
-            // shouldShowRequestPermissionRationale otomatis ngecek kalau user udah pernah nolak permission
-            // Kalau iya, tampilkan rationale dialog
             shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
                 showPermissionRationale {
                     requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                 }
             }
             else -> {
-                // Kalau belum pernah minta, langsung request permission
                 requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
         }
     }
 
     private fun getLastLocation() {
-        Log.d("MapsActivity", "getLastLocation() called.")
+        if (hasLocationPermission()) {
+            try {
+                fusedLocationProviderClient.lastLocation
+                    .addOnSuccessListener { location: Location? ->
+                        location?.let {
+                            val userLocation = LatLng(location.latitude, location.longitude)
+                            updateMapLocation(userLocation)
+                            addMarkerAtLocation(userLocation, "You")
+                        }
+                    }
+            } catch (e: SecurityException) {
+                Log.e("MapsActivity", "SecurityException: ${e.message}")
+            }
+        } else {
+            // If permission was rejected
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    private fun updateMapLocation(location: LatLng) {
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15f))
+    }
+
+    private fun addMarkerAtLocation(location: LatLng, title: String) {
+        mMap.addMarker(
+            MarkerOptions()
+                .title(title)
+                .position(location)
+        )
     }
 
     private fun showPermissionRationale(positiveAction: () -> Unit) {
@@ -97,7 +125,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             .show()
     }
 
-    // This is used to check if the user already has the permission granted
     private fun hasLocationPermission() =
         ContextCompat.checkSelfPermission(
             this,
